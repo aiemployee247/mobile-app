@@ -1,0 +1,15 @@
+export const colors = {
+  navy: '#041E42',
+  navyDeep: '#02152E',
+  accent: '#005AEE',
+  black: '#111111',
+  ink: '#111111',
+  muted: '#6B7280',
+  soft: '#9CA3AF',
+  border: '#C8CDD3',
+  link: '#0066CC',
+  white: '#FFFFFF',
+  surface: '#FFFFFF',
+  error: '#B3261E',
+  checkbox: '#111111',
+};
