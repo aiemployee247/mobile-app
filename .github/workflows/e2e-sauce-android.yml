@@ -1,0 +1,107 @@
+name: E2E — Build APK + Sauce Android
+
+# Builds a release APK from this repo, uploads it to Sauce Storage,
+# then runs Appium specs in e2e/ against that fresh build.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      device_name:
+        description: "Sauce device name"
+        required: false
+        default: "Google Pixel 7 GoogleAPI Emulator"
+        type: string
+      platform_version:
+        description: "Android platform version"
+        required: false
+        default: "14.0"
+        type: string
+
+run-name: "E2E Android @ Sauce (${{ github.event_name == 'workflow_dispatch' && inputs.device_name || 'Google Pixel 7 GoogleAPI Emulator' }} / ${{ github.event_name == 'workflow_dispatch' && inputs.platform_version || '14.0' }})"
+
+jobs:
+  e2e-android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install app dependencies
+        run: npm ci || npm install
+
+      - name: Prebuild Android (if needed)
+        run: |
+          if [ ! -d android ]; then
+            npx expo prebuild --platform android --no-install
+          fi
+
+      - name: Build release APK
+        working-directory: android
+        run: ./gradlew assembleRelease --no-daemon
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-apk
+          path: android/app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+
+      - name: Install e2e dependencies
+        working-directory: e2e
+        run: npm ci || npm install
+
+      - name: Upload APK to Sauce Storage + run Appium
+        working-directory: e2e
+        env:
+          APPIUM_PROVIDER: sauce
+          SAUCE_USERNAME: ${{ secrets.SAUCE_USERNAME }}
+          SAUCE_ACCESS_KEY: ${{ secrets.SAUCE_ACCESS_KEY }}
+          SAUCE_DEVICE_NAME: ${{ inputs.device_name || 'Google Pixel 7 GoogleAPI Emulator' }}
+          SAUCE_PLATFORM_VERSION: ${{ inputs.platform_version || '14.0' }}
+          SAUCE_BUILD: mobile-app-${{ github.run_id }}-${{ github.run_attempt }}
+          SAUCE_API: https://api.us-west-1.saucelabs.com
+        run: |
+          set -euo pipefail
+          if [ -z "${SAUCE_USERNAME:-}" ] || [ -z "${SAUCE_ACCESS_KEY:-}" ]; then
+            echo "::error::Missing SAUCE_USERNAME or SAUCE_ACCESS_KEY secrets"
+            exit 1
+          fi
+
+          APK="../android/app/build/outputs/apk/release/app-release.apk"
+          ls -lh "$APK"
+
+          echo "Uploading APK to Sauce Storage as mobile-app.apk…"
+          UPLOAD_JSON=$(curl -fsS -u "${SAUCE_USERNAME}:${SAUCE_ACCESS_KEY}" \
+            -X POST "${SAUCE_API}/v1/storage/upload" \
+            -F "payload=@${APK}" \
+            -F "name=mobile-app.apk")
+          echo "$UPLOAD_JSON" | python3 -m json.tool || echo "$UPLOAD_JSON"
+
+          FILE_ID=$(echo "$UPLOAD_JSON" | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d.get("item",d).get("id") or d.get("id") or "")')
+          if [ -z "$FILE_ID" ]; then
+            echo "::error::Sauce upload did not return a file id"
+            exit 1
+          fi
+
+          export MOBILE_APP_SAUCE_APP="storage:${FILE_ID}"
+          echo "Sauce app: $MOBILE_APP_SAUCE_APP"
+          echo "Device: $SAUCE_DEVICE_NAME ($SAUCE_PLATFORM_VERSION)"
+          npm run test:android

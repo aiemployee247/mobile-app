@@ -24,7 +24,12 @@
     "start": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "build:android": "cd android && ./gradlew assembleRelease",
+    "build:ios": "xcodebuild -workspace ios/GStream.xcworkspace -scheme GStream -configuration Release -sdk iphonesimulator -destination 'platform=iOS Simulator,name=GStream_iPhone' -derivedDataPath ios/build build",
+    "test:e2e:android": "npm --prefix e2e run test:android",
+    "test:e2e:ios": "npm --prefix e2e run test:ios",
+    "appium": "npm --prefix e2e run appium"
   },
   "private": true
 }

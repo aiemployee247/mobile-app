@@ -34,15 +34,30 @@ Then press `a` for Android, `i` for iOS, or scan the QR code with Expo Go.
 
 ```bash
 npx expo prebuild
-npx expo run:android
-npx expo run:ios
+npm run android   # or: npm run ios
 ```
 
-Release APK (Android):
+Release APK:
 
 ```bash
-cd android && ./gradlew assembleRelease
+npm run build:android
+# → android/app/build/outputs/apk/release/app-release.apk
 ```
+
+## E2E (Appium)
+
+Appium specs live in [`e2e/`](./e2e) so deploy CI can **build → upload → verify** the same commit.
+
+```bash
+npm install --prefix e2e
+npm run build:android
+npm run appium            # terminal 1
+npm run test:e2e:android  # terminal 2 (emulator running)
+```
+
+CI: `.github/workflows/e2e-sauce-android.yml` builds the APK, uploads to Sauce Labs, and runs the suite. Add secrets `SAUCE_USERNAME` and `SAUCE_ACCESS_KEY`.
+
+See [e2e/README.md](./e2e/README.md) for details.
 
 ## Try it
 

@@ -36,6 +36,10 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 
-# generated native folders
+# generated native folders (local prebuild — CI can regenerate)
 /ios
 /android
+
+# e2e
+e2e/node_modules/
+e2e/.env
